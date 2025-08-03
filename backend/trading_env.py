@@ -15,6 +15,10 @@ from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings('ignore')
 
+# Import new components
+from news_analyzer import NewsAnalyzer
+from risk_manager import RiskManager
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,13 +29,18 @@ class TradingEnvironment(gym.Env):
     Supports autonomous learning and per-stock optimization
     """
     
-    def __init__(self, symbol, initial_balance=100000, max_steps=1000, transaction_fee=0.001):
+    def __init__(self, symbol, initial_balance=100000, max_steps=1000, transaction_fee=0.001, mode='paper'):
         super().__init__()
         
         self.symbol = symbol
         self.initial_balance = initial_balance
         self.max_steps = max_steps
         self.transaction_fee = transaction_fee
+        self.mode = mode
+        
+        # Initialize components
+        self.news_analyzer = NewsAnalyzer()
+        self.risk_manager = RiskManager(mode=mode)
         
         # Initialize sentiment analysis model (FinBERT)
         try:
@@ -47,11 +56,11 @@ class TradingEnvironment(gym.Env):
         # Action space: 0=Hold, 1=Buy, 2=Sell, 3=Buy Call, 4=Buy Put
         self.action_space = spaces.Discrete(5)
         
-        # Observation space: [price, volume, rsi, macd, sentiment, position, balance_ratio]
+        # Enhanced observation space: [price, volume, rsi, macd, sentiment, position, balance_ratio, volatility, news_count]
         self.observation_space = spaces.Box(
             low=-np.inf, 
             high=np.inf, 
-            shape=(7,), 
+            shape=(9,), 
             dtype=np.float32
         )
         
@@ -139,24 +148,11 @@ class TradingEnvironment(gym.Env):
         self.data.fillna(0, inplace=True)
     
     def _get_sentiment_score(self):
-        """Get sentiment score for the current symbol (mock implementation)"""
-        if self.sentiment_pipeline is None:
-            return 0.5  # Neutral sentiment
-        
+        """Get sentiment score using real-time news analysis"""
         try:
-            # In a real implementation, you would fetch actual news headlines
-            # For now, we'll use a mock sentiment
-            sample_news = f"Market outlook for {self.symbol} remains positive with strong fundamentals"
-            result = self.sentiment_pipeline(sample_news)[0]
-            
-            # Convert to numerical score
-            if result['label'] == 'positive':
-                return min(result['score'], 1.0)
-            elif result['label'] == 'negative':
-                return max(1 - result['score'], 0.0)
-            else:
-                return 0.5
-                
+            # Get real-time news sentiment
+            sentiment_data = self.news_analyzer.get_news_sentiment(self.symbol, hours_back=24)
+            return sentiment_data.get('sentiment_score', 0.5)
         except Exception as e:
             logger.warning(f"Error getting sentiment: {e}")
             return 0.5
@@ -164,7 +160,7 @@ class TradingEnvironment(gym.Env):
     def _get_observation(self):
         """Get current observation state"""
         if len(self.data) == 0:
-            return np.zeros(7, dtype=np.float32)
+            return np.zeros(9, dtype=np.float32) # Updated shape
         
         current_idx = min(self.current_step, len(self.data) - 1)
         
@@ -181,6 +177,11 @@ class TradingEnvironment(gym.Env):
         position_ratio = self.position / 100.0  # Normalize position
         balance_ratio = self.balance / self.initial_balance
         
+        # Risk management and news analysis
+        volatility = self._calculate_volatility()
+        news_data = self.news_analyzer.get_news_sentiment(self.symbol, hours_back=24)
+        news_count = news_data.get('news_count', 0) / 100.0  # Normalize news count
+        
         observation = np.array([
             current_price / 100.0,  # Normalize price
             volume / 1000.0,       # Normalize volume
@@ -188,7 +189,9 @@ class TradingEnvironment(gym.Env):
             np.tanh(macd),         # Normalize MACD
             sentiment,             # Sentiment score [0,1]
             position_ratio,        # Position ratio
-            balance_ratio          # Balance ratio
+            balance_ratio,         # Balance ratio
+            volatility,            # Volatility
+            news_count             # News count
         ], dtype=np.float32)
         
         return observation
@@ -253,23 +256,36 @@ class TradingEnvironment(gym.Env):
         return self._get_observation(), reward, done, False, info
     
     def _execute_buy(self, price):
-        """Execute buy order"""
+        """Execute buy action with enhanced risk management"""
         if self.balance < price * (1 + self.transaction_fee):
             return -0.1  # Penalty for invalid trade
         
-        # Calculate maximum shares we can buy (small position sizing)
-        max_shares = min(10, int(self.balance * 0.1 / price))  # Use 10% of balance max
+        # Calculate position size using risk manager
+        quantity = self.risk_manager.calculate_position_size(self.symbol, price)
         
-        if max_shares > 0:
-            cost = max_shares * price * (1 + self.transaction_fee)
+        if quantity <= 0:
+            return -0.1
+        
+        # Check risk limits
+        risk_check = self.risk_manager.check_risk_limits(self.symbol, 'buy', quantity, price)
+        if not risk_check['approved']:
+            logger.warning(f"Risk check failed for {self.symbol}: {risk_check['rejections']}")
+            return -0.2  # Penalty for risk limit violation
+        
+        # Execute trade
+        cost = quantity * price * (1 + self.transaction_fee)
+        if cost <= self.balance:
             self.balance -= cost
-            self.position += max_shares
+            self.position += quantity
+            self.position_value = price
             self.total_trades += 1
             
-            # Positive reward for successful trade
-            return 0.05
-        
-        return -0.01  # Small penalty for failed trade
+            # Update risk metrics
+            self.risk_manager.update_risk_metrics(self.symbol, 'buy', quantity, price)
+            
+            return 0.01  # Small positive reward for successful trade
+        else:
+            return -0.1  # Penalty for insufficient funds
     
     def _execute_sell(self, price):
         """Execute sell order"""
@@ -319,6 +335,22 @@ class TradingEnvironment(gym.Env):
             price_change = (current_price - self.position_value) / self.position_value if self.position_value > 0 else 0
             return price_change * 0.1
         return 0
+    
+    def _calculate_volatility(self):
+        """Calculate current volatility"""
+        if len(self.data) < 5:
+            return 0.0
+        
+        try:
+            # Calculate rolling volatility
+            returns = self.data['Close'].pct_change().dropna()
+            if len(returns) > 0:
+                volatility = returns.std() * np.sqrt(252)  # Annualized
+                return min(volatility, 1.0)  # Cap at 100%
+            return 0.0
+        except Exception as e:
+            logger.error(f"Error calculating volatility: {e}")
+            return 0.0
     
     def _calculate_risk_penalty(self):
         """Calculate risk-based penalties"""

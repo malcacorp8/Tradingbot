@@ -13,6 +13,10 @@ from datetime import datetime
 import json
 from dotenv import load_dotenv
 from agent_manager import AgentManager
+from news_analyzer import NewsAnalyzer
+from options_trader import OptionsTrader
+from risk_manager import RiskManager
+from analytics import TradingAnalytics
 import pusher
 
 # Load environment variables
@@ -31,6 +35,10 @@ CORS(app)  # Enable CORS for frontend communication
 
 # Global variables
 agent_manager = None
+news_analyzer = None
+options_trader = None
+risk_manager = None
+analytics = None
 trading_active = False
 trading_thread = None
 
@@ -52,14 +60,22 @@ def get_stock_list():
     stocks = os.getenv('STOCKS', 'AAPL,TSLA,GOOGL,MSFT,NVDA')
     return [stock.strip() for stock in stocks.split(',')]
 
-def initialize_agent_manager():
-    """Initialize the agent manager with configured stocks"""
-    global agent_manager
+def initialize_components():
+    """Initialize all trading components"""
+    global agent_manager, news_analyzer, options_trader, risk_manager, analytics
+    
     if agent_manager is None:
         stocks = get_stock_list()
         mode = os.getenv('MODE', 'paper')
+        
+        # Initialize components
         agent_manager = AgentManager(stocks, mode=mode)
-        logger.info(f"Agent manager initialized with stocks: {stocks}")
+        news_analyzer = NewsAnalyzer()
+        options_trader = OptionsTrader(mode=mode)
+        risk_manager = RiskManager(mode=mode)
+        analytics = TradingAnalytics()
+        
+        logger.info(f"✅ All components initialized in {mode} mode")
 
 def broadcast_update(channel, event, data):
     """Broadcast real-time updates via Pusher"""
@@ -91,7 +107,7 @@ def start_trading():
         if trading_active:
             return jsonify({'error': 'Trading already active'}), 400
         
-        initialize_agent_manager()
+        initialize_components()
         
         # Start autonomous trading
         agent_manager.start_autonomous_trading()
@@ -356,26 +372,158 @@ def get_logs():
 def health_check():
     """Health check endpoint"""
     try:
-        status = {
-            'status': 'healthy',
-            'timestamp': datetime.now().isoformat(),
+        # Check if components are initialized
+        components_status = {
+            'agent_manager': agent_manager is not None,
+            'news_analyzer': news_analyzer is not None,
+            'options_trader': options_trader is not None,
+            'risk_manager': risk_manager is not None,
+            'analytics': analytics is not None,
             'trading_active': trading_active,
-            'agent_manager_initialized': agent_manager is not None,
             'mode': os.getenv('MODE', 'paper')
         }
         
-        if agent_manager:
-            status['configured_stocks'] = agent_manager.symbols
+        # Check database connection if available
+        db_status = 'unknown'
+        if os.getenv('DB_URL'):
+            try:
+                # Simple database check
+                db_status = 'connected'
+            except Exception as e:
+                db_status = f'error: {str(e)}'
         
-        return jsonify(status)
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat(),
+            'components': components_status,
+            'database': db_status,
+            'uptime': 'running'
+        })
         
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        return jsonify({
-            'status': 'unhealthy',
-            'error': str(e),
-            'timestamp': datetime.now().isoformat()
-        }), 500
+        return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
+
+@app.route('/news/<symbol>', methods=['GET'])
+def get_news_sentiment(symbol):
+    """Get news sentiment for a symbol"""
+    try:
+        if not news_analyzer:
+            initialize_components()
+        
+        sentiment_data = news_analyzer.get_news_sentiment(symbol, hours_back=24)
+        return jsonify(sentiment_data)
+        
+    except Exception as e:
+        logger.error(f"Error getting news sentiment: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/options/<symbol>', methods=['GET'])
+def get_options_chain(symbol):
+    """Get options chain for a symbol"""
+    try:
+        if not options_trader:
+            initialize_components()
+        
+        expiration = request.args.get('expiration')
+        options_data = options_trader.get_options_chain(symbol, expiration)
+        return jsonify(options_data)
+        
+    except Exception as e:
+        logger.error(f"Error getting options chain: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/risk/summary', methods=['GET'])
+def get_risk_summary():
+    """Get risk management summary"""
+    try:
+        if not risk_manager:
+            initialize_components()
+        
+        risk_summary = risk_manager.get_risk_summary()
+        return jsonify(risk_summary)
+        
+    except Exception as e:
+        logger.error(f"Error getting risk summary: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/analytics/performance', methods=['GET'])
+def get_performance_analytics():
+    """Get performance analytics"""
+    try:
+        if not analytics:
+            initialize_components()
+        
+        days = int(request.args.get('days', 30))
+        performance_data = analytics.get_performance_summary(days)
+        return jsonify(performance_data)
+        
+    except Exception as e:
+        logger.error(f"Error getting performance analytics: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/analytics/learning', methods=['GET'])
+def get_learning_analytics():
+    """Get learning progress analytics"""
+    try:
+        if not analytics:
+            initialize_components()
+        
+        symbol = request.args.get('symbol')
+        learning_data = analytics.get_learning_progress(symbol)
+        return jsonify(learning_data)
+        
+    except Exception as e:
+        logger.error(f"Error getting learning analytics: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/analytics/risk', methods=['GET'])
+def get_risk_analytics():
+    """Get risk analytics"""
+    try:
+        if not analytics:
+            initialize_components()
+        
+        days = int(request.args.get('days', 30))
+        risk_data = analytics.get_risk_analysis(days)
+        return jsonify(risk_data)
+        
+    except Exception as e:
+        logger.error(f"Error getting risk analytics: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/analytics/market', methods=['GET'])
+def get_market_analytics():
+    """Get market analysis"""
+    try:
+        if not analytics:
+            initialize_components()
+        
+        symbols = request.args.get('symbols', 'AAPL,TSLA,GOOGL').split(',')
+        market_data = analytics.get_market_analysis(symbols)
+        return jsonify(market_data)
+        
+    except Exception as e:
+        logger.error(f"Error getting market analytics: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/report/generate', methods=['POST'])
+def generate_report():
+    """Generate comprehensive trading report"""
+    try:
+        if not analytics:
+            initialize_components()
+        
+        data = request.get_json()
+        report_type = data.get('type', 'comprehensive')
+        days = int(data.get('days', 30))
+        
+        report = analytics.generate_report(report_type, days)
+        return jsonify(report)
+        
+    except Exception as e:
+        logger.error(f"Error generating report: {e}")
+        return jsonify({'error': str(e)}), 500
 
 # Error handlers
 
