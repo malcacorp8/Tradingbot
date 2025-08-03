@@ -1,0 +1,28 @@
+# Alpaca API Configuration
+ALPACA_PAPER_KEY=your_paper_api_key_here
+ALPACA_PAPER_SECRET=your_paper_secret_key_here
+ALPACA_LIVE_KEY=your_live_api_key_here
+ALPACA_LIVE_SECRET=your_live_secret_key_here
+
+# Database Configuration
+DB_URL=mysql+pymysql://user:password@localhost/trading_bot
+
+# Trading Configuration
+MODE=paper  # paper or live
+STOCKS=AAPL,TSLA,GOOGL,MSFT,NVDA
+POLLING_INTERVAL=10  # seconds
+
+# Risk Management
+MAX_POSITION_SIZE=0.01  # 1% of capital per trade
+STOP_LOSS_THRESHOLD=0.05  # 5% stop loss
+MAX_DAILY_TRADES=100
+
+# Real-time Communication
+PUSHER_APP_ID=your_pusher_app_id
+PUSHER_KEY=your_pusher_key
+PUSHER_SECRET=your_pusher_secret
+PUSHER_CLUSTER=us2
+
+# Flask Configuration
+FLASK_ENV=development
+FLASK_DEBUG=True
