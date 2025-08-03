@@ -238,8 +238,8 @@ class AgentManager:
                         if action is not None:
                             logger.info(f"{symbol}: Action={action}, Reward={reward:.4f}, Info={info}")
                     
-                    # Wait before next cycle (configurable polling interval)
-                    time.sleep(int(os.getenv('POLLING_INTERVAL', 10)))
+                    # Wait before next cycle (configurable polling interval) - increased to reduce frequency
+                    time.sleep(int(os.getenv('POLLING_INTERVAL', 30)))  # Changed from 10 to 30 seconds
                     
                 except Exception as e:
                     logger.error(f"Error in trading loop: {e}")

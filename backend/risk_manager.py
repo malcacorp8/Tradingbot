@@ -41,7 +41,7 @@ class RiskManager:
         self.max_position_size = float(os.getenv('MAX_POSITION_SIZE', 0.01))  # 1% default
         self.max_portfolio_concentration = float(os.getenv('MAX_PORTFOLIO_CONCENTRATION', 0.20))  # 20% default
         self.stop_loss_threshold = float(os.getenv('STOP_LOSS_THRESHOLD', 0.05))  # 5% default
-        self.max_daily_trades = int(os.getenv('MAX_DAILY_TRADES', 100))
+        self.max_daily_trades = int(os.getenv('MAX_DAILY_TRADES', 20))  # Reduced from 100 to 20
         self.max_daily_loss = float(os.getenv('MAX_DAILY_LOSS', 0.02))  # 2% default
         
         # Risk tracking
@@ -337,19 +337,28 @@ class RiskManager:
             )
             bars = self.data_client.get_stock_bars(request)
             
-            if bars and len(bars) > 1:
-                prices = [float(bar.close) for bar in bars]
-                returns = np.diff(np.log(prices))
-                volatility = np.std(returns) * np.sqrt(252)  # Annualized
+            # Fix: Handle BarSet object properly
+            if bars and hasattr(bars, '__len__') and len(bars) > 1:
+                # Convert BarSet to list if needed
+                if hasattr(bars, 'df'):
+                    # If it's a BarSet with DataFrame
+                    prices = bars.df['close'].tolist()
+                else:
+                    # If it's a list-like object
+                    prices = [float(bar.close) for bar in bars]
                 
-                # Adjust position size based on volatility
-                # Higher volatility = smaller position
-                if volatility > 0.5:  # High volatility
-                    return 0.5
-                elif volatility > 0.3:  # Medium volatility
-                    return 0.75
-                else:  # Low volatility
-                    return 1.0
+                if len(prices) > 1:
+                    returns = np.diff(np.log(prices))
+                    volatility = np.std(returns) * np.sqrt(252)  # Annualized
+                    
+                    # Adjust position size based on volatility
+                    # Higher volatility = smaller position
+                    if volatility > 0.5:  # High volatility
+                        return 0.5
+                    elif volatility > 0.3:  # Medium volatility
+                        return 0.75
+                    else:  # Low volatility
+                        return 1.0
             
             return 1.0  # Default adjustment
             

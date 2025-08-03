@@ -21,6 +21,9 @@
                                 <NavLink :href="route('advanced')" :active="route().current('advanced')">
                                     🧠 AI Trading
                                 </NavLink>
+                                <NavLink :href="route('advanced-training')" :active="route().current('advanced-training')">
+                                    🤖 Advanced Training
+                                </NavLink>
                                 <NavLink :href="route('analytics')" :active="route().current('analytics')">
                                     📈 Analytics
                                 </NavLink>

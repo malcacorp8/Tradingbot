@@ -352,4 +352,152 @@ class TradingBotController extends Controller
             ], 500);
         }
     }
+
+    // Advanced Training System Methods
+
+    /**
+     * Search for stocks
+     */
+    public function searchStocks(Request $request): JsonResponse
+    {
+        try {
+            $query = $request->get('query');
+            $response = Http::timeout(30)->get("{$this->backendUrl}/training/search-stocks", [
+                'query' => $query
+            ]);
+            
+            if ($response->successful()) {
+                return response()->json($response->json());
+            }
+            
+            return response()->json(['error' => 'Failed to search stocks'], $response->status());
+            
+        } catch (Exception $e) {
+            Log::error('Error searching stocks', ['error' => $e->getMessage()]);
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get stock information
+     */
+    public function stockInfo(Request $request, string $symbol): JsonResponse
+    {
+        try {
+            $response = Http::timeout(30)->get("{$this->backendUrl}/training/stock-info/{$symbol}");
+            
+            if ($response->successful()) {
+                return response()->json($response->json());
+            }
+            
+            return response()->json(['error' => 'Failed to get stock info'], $response->status());
+            
+        } catch (Exception $e) {
+            Log::error('Error getting stock info', ['error' => $e->getMessage()]);
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Import historical data
+     */
+    public function importData(Request $request): JsonResponse
+    {
+        try {
+            $response = Http::timeout(60)->post("{$this->backendUrl}/training/import-data", $request->all());
+            
+            if ($response->successful()) {
+                return response()->json($response->json());
+            }
+            
+            return response()->json(['error' => 'Failed to import data'], $response->status());
+            
+        } catch (Exception $e) {
+            Log::error('Error importing data', ['error' => $e->getMessage()]);
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Train advanced model
+     */
+    public function trainModel(Request $request): JsonResponse
+    {
+        try {
+            $response = Http::timeout(30)->post("{$this->backendUrl}/training/train-model", $request->all());
+            
+            if ($response->successful()) {
+                return response()->json($response->json());
+            }
+            
+            return response()->json(['error' => 'Failed to train model'], $response->status());
+            
+        } catch (Exception $e) {
+            Log::error('Error training model', ['error' => $e->getMessage()]);
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Run simulation
+     */
+    public function simulation(Request $request): JsonResponse
+    {
+        try {
+            $response = Http::timeout(60)->post("{$this->backendUrl}/training/simulation", $request->all());
+            
+            if ($response->successful()) {
+                return response()->json($response->json());
+            }
+            
+            return response()->json(['error' => 'Failed to run simulation'], $response->status());
+            
+        } catch (Exception $e) {
+            Log::error('Error running simulation', ['error' => $e->getMessage()]);
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get training status
+     */
+    public function trainingStatus(Request $request): JsonResponse
+    {
+        try {
+            $trainingId = $request->get('training_id');
+            $response = Http::timeout(30)->get("{$this->backendUrl}/training/status", [
+                'training_id' => $trainingId
+            ]);
+            
+            if ($response->successful()) {
+                return response()->json($response->json());
+            }
+            
+            return response()->json(['error' => 'Failed to get training status'], $response->status());
+            
+        } catch (Exception $e) {
+            Log::error('Error getting training status', ['error' => $e->getMessage()]);
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get available models
+     */
+    public function availableModels(Request $request): JsonResponse
+    {
+        try {
+            $response = Http::timeout(30)->get("{$this->backendUrl}/training/models");
+            
+            if ($response->successful()) {
+                return response()->json($response->json());
+            }
+            
+            return response()->json(['error' => 'Failed to get models'], $response->status());
+            
+        } catch (Exception $e) {
+            Log::error('Error getting models', ['error' => $e->getMessage()]);
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
 }

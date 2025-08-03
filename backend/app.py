@@ -17,6 +17,7 @@ from news_analyzer import NewsAnalyzer
 from options_trader import OptionsTrader
 from risk_manager import RiskManager
 from analytics import TradingAnalytics
+from advanced_training_system import AdvancedTrainingSystem
 import pusher
 
 # Load environment variables
@@ -39,6 +40,7 @@ news_analyzer = None
 options_trader = None
 risk_manager = None
 analytics = None
+advanced_training = None
 trading_active = False
 trading_thread = None
 
@@ -62,7 +64,7 @@ def get_stock_list():
 
 def initialize_components():
     """Initialize all trading components"""
-    global agent_manager, news_analyzer, options_trader, risk_manager, analytics
+    global agent_manager, news_analyzer, options_trader, risk_manager, analytics, advanced_training
     
     if agent_manager is None:
         stocks = get_stock_list()
@@ -74,6 +76,7 @@ def initialize_components():
         options_trader = OptionsTrader(mode=mode)
         risk_manager = RiskManager(mode=mode)
         analytics = TradingAnalytics()
+        advanced_training = AdvancedTrainingSystem(mode=mode)
         
         logger.info(f"✅ All components initialized in {mode} mode")
 
@@ -379,6 +382,7 @@ def health_check():
             'options_trader': options_trader is not None,
             'risk_manager': risk_manager is not None,
             'analytics': analytics is not None,
+            'advanced_training': advanced_training is not None,
             'trading_active': trading_active,
             'mode': os.getenv('MODE', 'paper')
         }
@@ -523,6 +527,136 @@ def generate_report():
         
     except Exception as e:
         logger.error(f"Error generating report: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# Advanced Training System API Routes
+
+@app.route('/training/search-stocks', methods=['GET'])
+def search_stocks():
+    """Search for stocks by symbol or company name"""
+    try:
+        if not advanced_training:
+            initialize_components()
+        
+        query = request.args.get('query', '')
+        limit = int(request.args.get('limit', 20))
+        
+        if not query:
+            return jsonify({'error': 'Query parameter is required'}), 400
+        
+        results = advanced_training.search_stocks(query, limit)
+        return jsonify({'stocks': results})
+        
+    except Exception as e:
+        logger.error(f"Error searching stocks: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/training/stock-info/<symbol>', methods=['GET'])
+def get_stock_info(symbol):
+    """Get detailed information about a specific stock"""
+    try:
+        if not advanced_training:
+            initialize_components()
+        
+        info = advanced_training.get_stock_info(symbol)
+        return jsonify(info)
+        
+    except Exception as e:
+        logger.error(f"Error getting stock info: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/training/import-data', methods=['POST'])
+def import_historical_data():
+    """Import historical data for training"""
+    try:
+        if not advanced_training:
+            initialize_components()
+        
+        data = request.get_json()
+        symbol = data.get('symbol')
+        months = int(data.get('months', 3))
+        
+        if not symbol:
+            return jsonify({'error': 'Symbol is required'}), 400
+        
+        result = advanced_training.import_historical_data(symbol, months)
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error importing data: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/training/train-model', methods=['POST'])
+def train_advanced_model():
+    """Train an advanced AI model"""
+    try:
+        if not advanced_training:
+            initialize_components()
+        
+        data = request.get_json()
+        symbol = data.get('symbol')
+        model_type = data.get('model_type', 'PPO')
+        training_steps = int(data.get('training_steps', 50000))
+        
+        if not symbol:
+            return jsonify({'error': 'Symbol is required'}), 400
+        
+        result = advanced_training.train_advanced_model(symbol, model_type, training_steps)
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error training model: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/training/simulation', methods=['POST'])
+def run_simulation():
+    """Run a simulation using trained model"""
+    try:
+        if not advanced_training:
+            initialize_components()
+        
+        data = request.get_json()
+        symbol = data.get('symbol')
+        days = int(data.get('days', 30))
+        model_path = data.get('model_path')
+        
+        if not symbol:
+            return jsonify({'error': 'Symbol is required'}), 400
+        
+        result = advanced_training.run_simulation(symbol, days, model_path)
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error running simulation: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/training/status', methods=['GET'])
+def get_training_status():
+    """Get training status and progress"""
+    try:
+        if not advanced_training:
+            initialize_components()
+        
+        training_id = request.args.get('training_id')
+        status = advanced_training.get_training_status(training_id)
+        return jsonify(status)
+        
+    except Exception as e:
+        logger.error(f"Error getting training status: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/training/models', methods=['GET'])
+def get_available_models():
+    """Get list of available trained models"""
+    try:
+        if not advanced_training:
+            initialize_components()
+        
+        models = advanced_training.get_available_models()
+        return jsonify({'models': models})
+        
+    except Exception as e:
+        logger.error(f"Error getting models: {e}")
         return jsonify({'error': str(e)}), 500
 
 # Error handlers

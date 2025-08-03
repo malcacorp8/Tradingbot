@@ -217,4 +217,27 @@ class DashboardController extends Controller
             'backendUrl' => $this->backendUrl
         ]);
     }
+
+    /**
+     * Show the advanced training page
+     */
+    public function advancedTraining(): Response
+    {
+        return Inertia::render('AdvancedTraining', [
+            'backendConnected' => $this->checkBackendConnection()
+        ]);
+    }
+
+    /**
+     * Check if backend is connected
+     */
+    private function checkBackendConnection(): bool
+    {
+        try {
+            $response = Http::timeout(5)->get("{$this->backendUrl}/health");
+            return $response->successful();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
 }

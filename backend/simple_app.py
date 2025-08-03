@@ -309,6 +309,141 @@ def get_logs():
         logger.error(f"Error getting logs: {e}")
         return jsonify({'error': str(e)}), 500
 
+# Training System Integration
+from advanced_training_system import AdvancedTrainingSystem
+
+# Initialize training system
+training_system = AdvancedTrainingSystem()
+
+@app.route('/training/search-stocks', methods=['GET'])
+def search_stocks():
+    """Search for stocks by symbol or company name"""
+    try:
+        query = request.args.get('query', '')
+        if not query:
+            return jsonify({'error': 'Query parameter is required'}), 400
+        
+        stocks = training_system.search_stocks(query)
+        return jsonify({
+            'stocks': stocks,
+            'query': query,
+            'count': len(stocks),
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error searching stocks: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/training/stock-info/<symbol>', methods=['GET'])
+def get_stock_info(symbol):
+    """Get detailed information about a specific stock"""
+    try:
+        stock_info = training_system.get_stock_info(symbol)
+        return jsonify({
+            'stock': stock_info,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting stock info for {symbol}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/training/import-data', methods=['POST'])
+def import_data():
+    """Import historical data for training"""
+    try:
+        data = request.get_json() or {}
+        symbol = data.get('symbol')
+        months = data.get('months', 3)
+        
+        if not symbol:
+            return jsonify({'error': 'Symbol is required'}), 400
+        
+        result = training_system.import_historical_data(symbol, months)
+        return jsonify({
+            'import_result': result,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error importing data: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/training/train-model', methods=['POST'])
+def train_model():
+    """Train advanced AI model"""
+    try:
+        data = request.get_json() or {}
+        symbol = data.get('symbol')
+        model_type = data.get('model_type', 'PPO')
+        training_steps = data.get('training_steps', 50000)
+        
+        if not symbol:
+            return jsonify({'error': 'Symbol is required'}), 400
+        
+        result = training_system.train_advanced_model(symbol, model_type, training_steps)
+        return jsonify({
+            'training_result': result,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error training model: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/training/simulation', methods=['POST'])
+def run_simulation():
+    """Run trading simulation"""
+    try:
+        data = request.get_json() or {}
+        symbol = data.get('symbol')
+        days = data.get('days', 30)
+        model_path = data.get('model_path')
+        
+        if not symbol:
+            return jsonify({'error': 'Symbol is required'}), 400
+        
+        result = training_system.run_simulation(symbol, days, model_path)
+        return jsonify({
+            'simulation_result': result,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error running simulation: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/training/status', methods=['GET'])
+def get_training_status():
+    """Get training status"""
+    try:
+        training_id = request.args.get('training_id')
+        status = training_system.get_training_status(training_id)
+        return jsonify({
+            'status': status,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting training status: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/training/models', methods=['GET'])
+def get_available_models():
+    """Get available trained models"""
+    try:
+        models = training_system.get_available_models()
+        return jsonify({
+            'models': models,
+            'count': len(models),
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting available models: {e}")
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     logger.info("Starting Simplified Trading Bot API Server")
     

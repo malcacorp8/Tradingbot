@@ -3,11 +3,14 @@ Reinforcement Learning Trading Environment
 Implements a Gym environment for autonomous trading with self-learning capabilities
 """
 
+import os
 import gymnasium as gym
 import numpy as np
 import pandas as pd
 from gymnasium import spaces
-import yfinance as yf
+from alpaca.data.historical import StockHistoricalDataClient
+from alpaca.data.requests import StockBarsRequest
+from alpaca.data.timeframe import TimeFrame
 from transformers import pipeline, AutoTokenizer, AutoModelForSequenceClassification
 import ta
 import logging
@@ -42,13 +45,24 @@ class TradingEnvironment(gym.Env):
         self.news_analyzer = NewsAnalyzer()
         self.risk_manager = RiskManager(mode=mode)
         
+        # Initialize Alpaca data client
+        self.data_client = StockHistoricalDataClient(
+            api_key=os.getenv(f'ALPACA_{mode.upper()}_KEY'),
+            secret_key=os.getenv(f'ALPACA_{mode.upper()}_SECRET')
+        )
+        
         # Initialize sentiment analysis model (FinBERT)
         try:
+            # Try to load FinBERT with compatibility fixes
             self.sentiment_tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert")
             self.sentiment_model = AutoModelForSequenceClassification.from_pretrained("ProsusAI/finbert")
+            
+            # Use CPU for compatibility
             self.sentiment_pipeline = pipeline("sentiment-analysis", 
                                               model=self.sentiment_model, 
-                                              tokenizer=self.sentiment_tokenizer)
+                                              tokenizer=self.sentiment_tokenizer,
+                                              device=-1)  # Force CPU
+            logger.info("✅ FinBERT sentiment analysis loaded successfully")
         except Exception as e:
             logger.warning(f"Could not load FinBERT model: {e}. Using default sentiment.")
             self.sentiment_pipeline = None
@@ -89,15 +103,34 @@ class TradingEnvironment(gym.Env):
         return self._get_observation(), {}
     
     def _fetch_market_data(self):
-        """Fetch real-time market data for the symbol"""
+        """Fetch real-time market data for the symbol using Alpaca"""
         try:
-            # Get recent data (last 30 days for technical indicators)
+            # Get recent data (last 7 days for technical indicators)
             end_date = datetime.now()
-            start_date = end_date - timedelta(days=30)
+            start_date = end_date - timedelta(days=7)
             
-            self.data = yf.download(self.symbol, start=start_date, end=end_date, interval="1m")
+            # Use Alpaca data with 5-minute intervals
+            request = StockBarsRequest(
+                symbol_or_symbols=self.symbol,
+                timeframe=TimeFrame.Minute(5),
+                start=start_date,
+                end=end_date
+            )
             
-            if len(self.data) == 0:
+            bars = self.data_client.get_stock_bars(request)
+            
+            if bars and hasattr(bars, 'df') and len(bars.df) > 0:
+                # Convert Alpaca bars to DataFrame
+                self.data = bars.df.reset_index()
+                # Rename columns to match expected format
+                self.data.rename(columns={
+                    'open': 'Open',
+                    'high': 'High', 
+                    'low': 'Low',
+                    'close': 'Close',
+                    'volume': 'Volume'
+                }, inplace=True)
+            else:
                 logger.error(f"No data available for {self.symbol}")
                 # Create dummy data for testing
                 self.data = pd.DataFrame({

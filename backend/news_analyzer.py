@@ -29,11 +29,15 @@ class NewsAnalyzer:
         
         # Initialize sentiment analysis model
         try:
+            # Try to load FinBERT with compatibility fixes
             self.sentiment_tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert")
             self.sentiment_model = AutoModelForSequenceClassification.from_pretrained("ProsusAI/finbert")
+            
+            # Use CPU for compatibility
             self.sentiment_pipeline = pipeline("sentiment-analysis", 
                                               model=self.sentiment_model, 
-                                              tokenizer=self.sentiment_tokenizer)
+                                              tokenizer=self.sentiment_tokenizer,
+                                              device=-1)  # Force CPU
             logger.info("✅ FinBERT sentiment model loaded successfully")
         except Exception as e:
             logger.error(f"❌ Failed to load FinBERT model: {e}")
