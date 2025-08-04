@@ -559,11 +559,38 @@ def get_stock_info(symbol):
             initialize_components()
         
         info = advanced_training.get_stock_info(symbol)
-        return jsonify(info)
+        
+        # If no info returned, provide fallback structure
+        if not info:
+            return jsonify({
+                'stock': {
+                    'symbol': symbol,
+                    'name': f'{symbol} Stock',
+                    'exchange': 'NASDAQ',
+                    'status': 'active',
+                    'tradable': True,
+                    'current_price': None,
+                    'performance': None
+                },
+                'message': f'Limited information available for {symbol}'
+            })
+        
+        return jsonify({'stock': info})
         
     except Exception as e:
         logger.error(f"Error getting stock info: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'error': str(e),
+            'stock': {
+                'symbol': symbol,
+                'name': f'{symbol} Stock',
+                'exchange': 'NASDAQ',
+                'status': 'active',
+                'tradable': True,
+                'current_price': None,
+                'performance': None
+            }
+        }), 500
 
 @app.route('/training/import-data', methods=['POST'])
 def import_historical_data():

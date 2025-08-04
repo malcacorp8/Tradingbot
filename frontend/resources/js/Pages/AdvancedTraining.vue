@@ -80,23 +80,98 @@
                             </div>
                         </div>
                         
+                        <!-- Current Trading List -->
+                        <div v-if="configuredStocks.length > 0" class="mt-4 p-4 bg-blue-50 rounded-lg">
+                            <h4 class="font-medium mb-3 text-blue-800">📈 Current Trading List</h4>
+                            <div class="flex flex-wrap gap-2">
+                                <span 
+                                    v-for="stock in configuredStocks" 
+                                    :key="stock"
+                                    class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
+                                >
+                                    {{ stock }}
+                                    <button 
+                                        @click="removeFromTradingList(stock)"
+                                        :disabled="updatingStocks"
+                                        class="ml-2 text-blue-600 hover:text-red-600 transition-colors"
+                                        title="Remove from trading list"
+                                    >
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                        </svg>
+                                    </button>
+                                </span>
+                            </div>
+                        </div>
+
                         <!-- Search Results -->
                         <div v-if="searchResults.length > 0" class="mt-4">
-                            <h4 class="font-medium mb-2">Search Results:</h4>
+                            <h4 class="font-medium mb-2">🔍 Search Results:</h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <div 
                                     v-for="stock in searchResults" 
                                     :key="stock.symbol"
-                                    @click="selectStock(stock)"
-                                    class="border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                                    class="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                                    :class="stock.tradable ? 'border-gray-200' : 'border-gray-100 bg-gray-50'"
                                 >
                                     <div class="font-semibold text-lg">{{ stock.symbol }}</div>
-                                    <div class="text-gray-600">{{ stock.name }}</div>
-                                    <div class="text-sm text-gray-500">{{ stock.exchange }}</div>
-                                    <div class="text-sm" :class="stock.tradable ? 'text-green-600' : 'text-red-600'">
-                                        {{ stock.tradable ? 'Tradable' : 'Not Tradable' }}
+                                    <div class="text-gray-600 text-sm mb-2">{{ stock.name }}</div>
+                                    <div class="text-xs text-gray-500 mb-3">{{ stock.exchange }}</div>
+                                    <div class="text-sm mb-3" :class="stock.tradable ? 'text-green-600' : 'text-red-600'">
+                                        {{ stock.tradable ? '✅ Tradable' : '❌ Not Tradable' }}
+                                    </div>
+                                    
+                                    <div class="flex gap-2">
+                                        <button 
+                                            @click="selectStock(stock)"
+                                            class="flex-1 px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+                                        >
+                                            View Details
+                                        </button>
+                                        
+                                        <button 
+                                            v-if="stock.tradable && !configuredStocks.includes(stock.symbol)"
+                                            @click="addToTradingList(stock.symbol)"
+                                            :disabled="updatingStocks"
+                                            class="flex-1 px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50"
+                                        >
+                                            {{ updatingStocks ? 'Adding...' : 'Add to List' }}
+                                        </button>
+                                        
+                                        <button 
+                                            v-else-if="stock.tradable && configuredStocks.includes(stock.symbol)"
+                                            @click="removeFromTradingList(stock.symbol)"
+                                            :disabled="updatingStocks"
+                                            class="flex-1 px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors disabled:opacity-50"
+                                        >
+                                            {{ updatingStocks ? 'Removing...' : 'Remove' }}
+                                        </button>
+                                        
+                                        <span 
+                                            v-else
+                                            class="flex-1 px-3 py-1 text-sm bg-gray-300 text-gray-500 rounded text-center"
+                                        >
+                                            Not Tradable
+                                        </span>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stock Error Display -->
+                <div v-if="stockError" class="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-yellow-800">Notice</h3>
+                            <div class="mt-2 text-sm text-yellow-700">
+                                {{ stockError }}
                             </div>
                         </div>
                     </div>
@@ -151,12 +226,66 @@
                         </div>
                         
                         <!-- Import Results -->
-                        <div v-if="importResult" class="mt-4 p-4 bg-gray-50 rounded-lg">
-                            <h4 class="font-medium mb-2">Import Results:</h4>
-                            <div class="space-y-2">
-                                <div><strong>Data Points:</strong> {{ importResult.data_points }}</div>
-                                <div><strong>Date Range:</strong> {{ importResult.date_range?.start }} to {{ importResult.date_range?.end }}</div>
-                                <div><strong>Price Range:</strong> ${{ importResult.statistics?.price_stats?.min?.toFixed(2) }} - ${{ importResult.statistics?.price_stats?.max?.toFixed(2) }}</div>
+                        <div v-if="importResult" class="mt-4">
+                            <div v-if="importResult.error" class="p-4 bg-red-50 border border-red-200 rounded-lg">
+                                <h4 class="font-medium text-red-800 mb-2">❌ Import Error:</h4>
+                                <p class="text-red-700">{{ importResult.error }}</p>
+                            </div>
+                            
+                            <div v-else-if="importResult.success" class="p-4 bg-green-50 border border-green-200 rounded-lg">
+                                <h4 class="font-medium text-green-800 mb-4">✅ Data Successfully Imported</h4>
+                                
+                                <!-- Summary Stats -->
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                                    <div class="bg-white p-3 rounded shadow-sm">
+                                        <div class="text-sm text-gray-600">Data Points</div>
+                                        <div class="text-lg font-semibold">{{ importResult.data_points?.toLocaleString() }}</div>
+                                    </div>
+                                    <div class="bg-white p-3 rounded shadow-sm">
+                                        <div class="text-sm text-gray-600">Date Range</div>
+                                        <div class="text-sm font-semibold">{{ formatDateRange(importResult.date_range) }}</div>
+                                    </div>
+                                    <div class="bg-white p-3 rounded shadow-sm">
+                                        <div class="text-sm text-gray-600">Price Range</div>
+                                        <div class="text-sm font-semibold">
+                                            ${{ importResult.price_summary?.min_price?.toFixed(2) }} - 
+                                            ${{ importResult.price_summary?.max_price?.toFixed(2) }}
+                                        </div>
+                                    </div>
+                                    <div class="bg-white p-3 rounded shadow-sm">
+                                        <div class="text-sm text-gray-600">Total Volume</div>
+                                        <div class="text-sm font-semibold">{{ importResult.price_summary?.total_volume?.toLocaleString() }}</div>
+                                    </div>
+                                </div>
+
+                                <!-- Sample Data Table -->
+                                <div v-if="importResult.sample_data && importResult.sample_data.length > 0" class="mt-4">
+                                    <h5 class="font-medium text-gray-700 mb-2">📈 Recent Data Sample (Last 10 points):</h5>
+                                    <div class="overflow-x-auto">
+                                        <table class="min-w-full text-xs bg-white border border-gray-200 rounded">
+                                            <thead class="bg-gray-50">
+                                                <tr>
+                                                    <th class="px-2 py-1 text-left border-b">Time</th>
+                                                    <th class="px-2 py-1 text-right border-b">Open</th>
+                                                    <th class="px-2 py-1 text-right border-b">High</th>
+                                                    <th class="px-2 py-1 text-right border-b">Low</th>
+                                                    <th class="px-2 py-1 text-right border-b">Close</th>
+                                                    <th class="px-2 py-1 text-right border-b">Volume</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr v-for="(row, index) in importResult.sample_data.slice(-10)" :key="index" class="hover:bg-gray-50">
+                                                    <td class="px-2 py-1 border-b text-gray-600">{{ formatTimestamp(row.timestamp) }}</td>
+                                                    <td class="px-2 py-1 border-b text-right">${{ row.Open?.toFixed(2) }}</td>
+                                                    <td class="px-2 py-1 border-b text-right text-green-600">${{ row.High?.toFixed(2) }}</td>
+                                                    <td class="px-2 py-1 border-b text-right text-red-600">${{ row.Low?.toFixed(2) }}</td>
+                                                    <td class="px-2 py-1 border-b text-right font-medium">${{ row.Close?.toFixed(2) }}</td>
+                                                    <td class="px-2 py-1 border-b text-right text-gray-600">{{ row.Volume?.toLocaleString() }}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -229,22 +358,119 @@
                         </div>
                         
                         <!-- Simulation Results -->
-                        <div v-if="simulationResult" class="mt-4 p-4 bg-green-50 rounded-lg">
-                            <h4 class="font-medium mb-2">Simulation Results:</h4>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <div><strong>Total Return:</strong> 
-                                        <span :class="simulationResult.total_return_pct >= 0 ? 'text-green-600' : 'text-red-600'">
-                                            {{ simulationResult.total_return_pct?.toFixed(2) }}%
-                                        </span>
+                        <div v-if="simulationResult" class="mt-4">
+                            <div v-if="simulationResult.error" class="p-4 bg-red-50 border border-red-200 rounded-lg">
+                                <h4 class="font-medium text-red-800 mb-2">❌ Simulation Error:</h4>
+                                <p class="text-red-700">{{ simulationResult.error }}</p>
+                            </div>
+                            
+                            <div v-else class="space-y-4">
+                                <!-- Success Banner -->
+                                <div class="p-4 bg-green-50 border border-green-200 rounded-lg">
+                                    <h4 class="font-medium text-green-800 mb-4">✅ Simulation Completed Successfully</h4>
+                                    
+                                    <!-- Performance Metrics -->
+                                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                                        <div class="bg-white p-3 rounded shadow-sm">
+                                            <div class="text-sm text-gray-600">Total Return</div>
+                                            <div class="text-lg font-semibold" :class="simulationResult.total_return_pct >= 0 ? 'text-green-600' : 'text-red-600'">
+                                                {{ simulationResult.total_return_pct?.toFixed(2) }}%
+                                            </div>
+                                        </div>
+                                        <div class="bg-white p-3 rounded shadow-sm">
+                                            <div class="text-sm text-gray-600">Win Rate</div>
+                                            <div class="text-lg font-semibold text-blue-600">{{ simulationResult.win_rate?.toFixed(1) }}%</div>
+                                        </div>
+                                        <div class="bg-white p-3 rounded shadow-sm">
+                                            <div class="text-sm text-gray-600">Total Trades</div>
+                                            <div class="text-lg font-semibold">{{ simulationResult.total_trades }}</div>
+                                        </div>
+                                        <div class="bg-white p-3 rounded shadow-sm">
+                                            <div class="text-sm text-gray-600">Sharpe Ratio</div>
+                                            <div class="text-lg font-semibold text-purple-600">{{ simulationResult.sharpe_ratio?.toFixed(3) }}</div>
+                                        </div>
                                     </div>
-                                    <div><strong>Total Trades:</strong> {{ simulationResult.total_trades }}</div>
-                                    <div><strong>Initial Value:</strong> ${{ simulationResult.initial_value?.toFixed(2) }}</div>
-                                    <div><strong>Final Value:</strong> ${{ simulationResult.final_value?.toFixed(2) }}</div>
-                                </div>
-                                <div>
-                                    <div><strong>Total Reward:</strong> {{ simulationResult.total_reward?.toFixed(4) }}</div>
-                                    <div><strong>Simulation Days:</strong> {{ simulationDays }}</div>
+                                    
+                                    <!-- Detailed Metrics -->
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                        <div class="bg-white p-4 rounded shadow-sm">
+                                            <h5 class="font-medium mb-2 text-gray-700">💰 Portfolio Performance</h5>
+                                            <div class="space-y-1 text-sm">
+                                                <div><strong>Initial Value:</strong> ${{ simulationResult.initial_value?.toFixed(2) }}</div>
+                                                <div><strong>Final Value:</strong> ${{ simulationResult.final_value?.toFixed(2) }}</div>
+                                                <div><strong>Max Drawdown:</strong> <span class="text-red-600">{{ simulationResult.max_drawdown?.toFixed(2) }}%</span></div>
+                                                <div><strong>Total Reward:</strong> {{ simulationResult.total_reward?.toFixed(4) }}</div>
+                                            </div>
+                                        </div>
+                                        <div class="bg-white p-4 rounded shadow-sm">
+                                            <h5 class="font-medium mb-2 text-gray-700">📊 Trading Accuracy</h5>
+                                            <div class="space-y-1 text-sm">
+                                                <div><strong>Winning Trades:</strong> <span class="text-green-600">{{ simulationResult.winning_trades }}</span></div>
+                                                <div><strong>Losing Trades:</strong> <span class="text-red-600">{{ simulationResult.losing_trades }}</span></div>
+                                                <div><strong>Avg Win:</strong> <span class="text-green-600">{{ simulationResult.avg_win?.toFixed(4) }}</span></div>
+                                                <div><strong>Avg Loss:</strong> <span class="text-red-600">{{ simulationResult.avg_loss?.toFixed(4) }}</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Recent Trades -->
+                                    <div v-if="simulationResult.trades && simulationResult.trades.length > 0" class="bg-white p-4 rounded shadow-sm">
+                                        <h5 class="font-medium mb-2 text-gray-700">📈 Recent Trades</h5>
+                                        <div class="overflow-x-auto">
+                                            <table class="min-w-full text-xs">
+                                                <thead class="bg-gray-50">
+                                                    <tr>
+                                                        <th class="px-2 py-1 text-left">Step</th>
+                                                        <th class="px-2 py-1 text-left">Action</th>
+                                                        <th class="px-2 py-1 text-right">Price</th>
+                                                        <th class="px-2 py-1 text-right">Reward</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr v-for="(trade, index) in simulationResult.trades" :key="index" class="border-t">
+                                                        <td class="px-2 py-1">{{ trade.step }}</td>
+                                                        <td class="px-2 py-1">
+                                                            <span :class="trade.action === 'buy' ? 'text-green-600' : 'text-red-600'">
+                                                                {{ trade.action.toUpperCase() }}
+                                                            </span>
+                                                        </td>
+                                                        <td class="px-2 py-1 text-right">${{ trade.price?.toFixed(2) }}</td>
+                                                        <td class="px-2 py-1 text-right" :class="trade.reward >= 0 ? 'text-green-600' : 'text-red-600'">
+                                                            {{ trade.reward?.toFixed(4) }}
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Model Saving Option -->
+                                    <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                                        <h5 class="font-medium mb-2 text-blue-800">💾 Save This Model</h5>
+                                        <div class="flex gap-2 items-end">
+                                            <div class="flex-1">
+                                                <label class="block text-sm font-medium text-gray-700 mb-1">Model Name</label>
+                                                <input 
+                                                    v-model="saveModelName" 
+                                                    type="text" 
+                                                    :placeholder="`${selectedStockSymbol}_best_model`"
+                                                    class="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md shadow-sm"
+                                                />
+                                            </div>
+                                            <div class="flex-1">
+                                                <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                                <input 
+                                                    v-model="saveModelDescription" 
+                                                    type="text" 
+                                                    placeholder="High performance model with 65% win rate"
+                                                    class="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md shadow-sm"
+                                                />
+                                            </div>
+                                            <PrimaryButton @click="saveModel" :disabled="savingModel" class="whitespace-nowrap">
+                                                {{ savingModel ? 'Saving...' : 'Save Model' }}
+                                            </PrimaryButton>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -289,6 +515,12 @@ const importing = ref(false)
 const training = ref(false)
 const simulating = ref(false)
 const isAuthenticated = ref(false)
+const stockError = ref(null)
+const configuredStocks = ref([])
+const updatingStocks = ref(false)
+const saveModelName = ref('')
+const saveModelDescription = ref('')
+const savingModel = ref(false)
 
 // Import settings
 const importMonths = ref(3)
@@ -316,13 +548,14 @@ const loadStockInfo = async () => {
     if (!selectedStockSymbol.value) return
     
     loadingStock.value = true
+    stockError.value = null
+    
     try {
         // First get stock info
         const response = await fetch(`/api/training/stock-info/${selectedStockSymbol.value}`)
         
         if (response.status === 401) {
-            console.error('Authentication required. Please log in.')
-            alert('Please log in to access the Advanced Training features.')
+            stockError.value = 'Authentication required. Please log in to access the Advanced Training features.'
             return
         }
         
@@ -334,6 +567,9 @@ const loadStockInfo = async () => {
         
         if (data.stock) {
             selectedStock.value = data.stock
+            if (data.message) {
+                stockError.value = data.message
+            }
         } else {
             // Fallback: create basic stock object
             selectedStock.value = {
@@ -343,13 +579,12 @@ const loadStockInfo = async () => {
                 status: 'active',
                 tradable: true
             }
+            stockError.value = 'Limited information available for this stock'
         }
     } catch (error) {
         console.error('Error loading stock info:', error)
-        if (error.message.includes('Unexpected token')) {
-            alert('Please log in to access the Advanced Training features.')
-            return
-        }
+        stockError.value = `Error loading stock data: ${error.message}`
+        
         // Fallback: create basic stock object
         selectedStock.value = {
             symbol: selectedStockSymbol.value,
@@ -549,8 +784,150 @@ const checkAuthentication = async () => {
     }
 }
 
+// Helper methods for formatting data
+const formatDateRange = (dateRange) => {
+    if (!dateRange || !dateRange.start || !dateRange.end) return 'N/A'
+    const start = new Date(dateRange.start)
+    const end = new Date(dateRange.end)
+    return `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`
+}
+
+const formatTimestamp = (timestamp) => {
+    if (!timestamp) return 'N/A'
+    const date = new Date(timestamp)
+    return date.toLocaleString('en-US', {
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    })
+}
+
+// Stock management methods
+const loadConfiguredStocks = async () => {
+    try {
+        const response = await fetch('/api/bot/health')
+        if (response.ok) {
+            const data = await response.json()
+            if (data.data && data.data.configured_stocks) {
+                configuredStocks.value = data.data.configured_stocks
+            }
+        }
+    } catch (error) {
+        console.error('Error loading configured stocks:', error)
+    }
+}
+
+const addToTradingList = async (symbol) => {
+    if (configuredStocks.value.includes(symbol)) return
+    
+    updatingStocks.value = true
+    try {
+        const newStocks = [...configuredStocks.value, symbol]
+        const response = await fetch('/api/bot/configure', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({
+                stocks: newStocks
+            })
+        })
+        
+        if (response.ok) {
+            const data = await response.json()
+            if (data.success && data.data && data.data.stocks) {
+                configuredStocks.value = data.data.stocks
+                alert(`✅ ${symbol} added to trading list successfully!`)
+            }
+        } else {
+            throw new Error('Failed to update trading list')
+        }
+    } catch (error) {
+        console.error('Error adding stock to trading list:', error)
+        alert(`❌ Failed to add ${symbol} to trading list: ${error.message}`)
+    } finally {
+        updatingStocks.value = false
+    }
+}
+
+const removeFromTradingList = async (symbol) => {
+    if (!configuredStocks.value.includes(symbol)) return
+    
+    updatingStocks.value = true
+    try {
+        const newStocks = configuredStocks.value.filter(stock => stock !== symbol)
+        const response = await fetch('/api/bot/configure', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({
+                stocks: newStocks
+            })
+        })
+        
+        if (response.ok) {
+            const data = await response.json()
+            if (data.success && data.data && data.data.stocks) {
+                configuredStocks.value = data.data.stocks
+                alert(`✅ ${symbol} removed from trading list successfully!`)
+            }
+        } else {
+            throw new Error('Failed to update trading list')
+        }
+    } catch (error) {
+        console.error('Error removing stock from trading list:', error)
+        alert(`❌ Failed to remove ${symbol} from trading list: ${error.message}`)
+    } finally {
+        updatingStocks.value = false
+    }
+}
+
+const saveModel = async () => {
+    if (!selectedStockSymbol.value) {
+        alert('❌ Please select a stock first')
+        return
+    }
+    
+    savingModel.value = true
+    try {
+        const response = await fetch('/api/training/save-model', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                symbol: selectedStockSymbol.value,
+                model_name: saveModelName.value || undefined,
+                description: saveModelDescription.value || ''
+            })
+        })
+        
+        const data = await response.json()
+        
+        if (response.ok && data.save_result && data.save_result.success) {
+            alert(`✅ Model saved successfully as "${data.save_result.model_name}"`)
+            saveModelName.value = ''
+            saveModelDescription.value = ''
+        } else {
+            const error = data.save_result?.error || data.error || 'Unknown error'
+            alert(`❌ Failed to save model: ${error}`)
+        }
+    } catch (error) {
+        console.error('Error saving model:', error)
+        alert(`❌ Failed to save model: ${error.message}`)
+    } finally {
+        savingModel.value = false
+    }
+}
+
 // Load available models on mount
 onMounted(() => {
     checkAuthentication()
+    loadConfiguredStocks()
 })
 </script> 

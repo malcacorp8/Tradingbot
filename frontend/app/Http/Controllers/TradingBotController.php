@@ -500,4 +500,54 @@ class TradingBotController extends Controller
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
+
+    /**
+     * Save/export a trained model
+     */
+    public function saveModel(Request $request): JsonResponse
+    {
+        $request->validate([
+            'symbol' => 'required|string|max:10',
+            'model_name' => 'sometimes|string|max:100',
+            'description' => 'sometimes|string|max:255'
+        ]);
+
+        try {
+            $response = Http::timeout(30)->post("{$this->backendUrl}/training/save-model", [
+                'symbol' => $request->symbol,
+                'model_name' => $request->model_name,
+                'description' => $request->description ?? ''
+            ]);
+            
+            if ($response->successful()) {
+                return response()->json($response->json());
+            }
+            
+            return response()->json(['error' => 'Failed to save model'], $response->status());
+            
+        } catch (Exception $e) {
+            Log::error('Error saving model', ['error' => $e->getMessage()]);
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get list of saved models
+     */
+    public function getSavedModels(): JsonResponse
+    {
+        try {
+            $response = Http::timeout(30)->get("{$this->backendUrl}/training/saved-models");
+            
+            if ($response->successful()) {
+                return response()->json($response->json());
+            }
+            
+            return response()->json(['error' => 'Failed to get saved models'], $response->status());
+            
+        } catch (Exception $e) {
+            Log::error('Error getting saved models', ['error' => $e->getMessage()]);
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
 }
