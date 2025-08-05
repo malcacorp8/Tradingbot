@@ -36,6 +36,20 @@ Route::middleware(['auth:sanctum,web'])->prefix('bot')->group(function () {
     Route::post('/retrain/{symbol}', [TradingBotController::class, 'retrain'])->name('bot.retrain');
 });
 
+// Advanced Logging API Routes - Read operations (no auth required for logs)
+Route::prefix('logs')->group(function () {
+    Route::get('/advanced', [TradingBotController::class, 'getAdvancedLogs'])->name('logs.advanced');
+    Route::get('/summary', [TradingBotController::class, 'getLogSummary'])->name('logs.summary');
+    Route::get('/stocks', [TradingBotController::class, 'getAvailableStocks'])->name('logs.stocks');
+    Route::get('/bots', [TradingBotController::class, 'getAvailableBots'])->name('logs.bots');
+    Route::get('/download', [TradingBotController::class, 'downloadLogs'])->name('logs.download');
+});
+
+// Advanced Logging API Routes - Write operations (auth required)
+Route::middleware(['auth:sanctum,web'])->prefix('logs')->group(function () {
+    Route::post('/archive', [TradingBotController::class, 'archiveLogs'])->name('logs.archive');
+});
+
 // Advanced Training API Routes - Read-only endpoints (no auth required)
 Route::prefix('training')->group(function () {
     Route::get('/search-stocks', [TradingBotController::class, 'searchStocks'])->name('training.search-stocks');

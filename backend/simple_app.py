@@ -2,11 +2,15 @@
 Simplified Trading Bot Backend for Testing Alpaca Connection
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import os
 import logging
 import time
+import json
+import glob
+import gzip
+from pathlib import Path
 from datetime import datetime, timedelta
 import requests
 from dotenv import load_dotenv
@@ -17,6 +21,356 @@ load_dotenv()
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+class AdvancedTradingLogger:
+    """Advanced logging system for trading bot activities"""
+    
+    def __init__(self, base_log_dir="logs/trading"):
+        self.base_log_dir = Path(base_log_dir)
+        self.base_log_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create subdirectories for different log types
+        self.daily_logs_dir = self.base_log_dir / "daily"
+        self.stock_logs_dir = self.base_log_dir / "stocks"
+        self.bot_logs_dir = self.base_log_dir / "bots"
+        self.archived_logs_dir = self.base_log_dir / "archived"
+        
+        for log_dir in [self.daily_logs_dir, self.stock_logs_dir, self.bot_logs_dir, self.archived_logs_dir]:
+            log_dir.mkdir(parents=True, exist_ok=True)
+    
+    def log_trading_activity(self, stock_symbol, bot_type, action, details, timestamp=None):
+        """Log trading activity with structured data"""
+        if timestamp is None:
+            timestamp = datetime.now()
+        
+        log_entry = {
+            "timestamp": timestamp.isoformat(),
+            "stock": stock_symbol,
+            "bot_type": bot_type,
+            "action": action,
+            "details": details,
+            "day": timestamp.strftime("%Y-%m-%d"),
+            "time": timestamp.strftime("%H:%M:%S")
+        }
+        
+        # Log to daily file
+        self._write_daily_log(log_entry, timestamp)
+        
+        # Log to stock-specific file
+        self._write_stock_log(log_entry, stock_symbol, timestamp)
+        
+        # Log to bot-specific file
+        self._write_bot_log(log_entry, bot_type, timestamp)
+    
+    def _write_daily_log(self, log_entry, timestamp):
+        """Write to daily log file"""
+        date_str = timestamp.strftime("%Y-%m-%d")
+        log_file = self.daily_logs_dir / f"trading_{date_str}.json"
+        
+        self._append_to_log_file(log_file, log_entry)
+    
+    def _write_stock_log(self, log_entry, stock_symbol, timestamp):
+        """Write to stock-specific log file"""
+        date_str = timestamp.strftime("%Y-%m-%d")
+        stock_dir = self.stock_logs_dir / stock_symbol
+        stock_dir.mkdir(exist_ok=True)
+        log_file = stock_dir / f"{stock_symbol}_{date_str}.json"
+        
+        self._append_to_log_file(log_file, log_entry)
+    
+    def _write_bot_log(self, log_entry, bot_type, timestamp):
+        """Write to bot-specific log file"""
+        date_str = timestamp.strftime("%Y-%m-%d")
+        bot_dir = self.bot_logs_dir / bot_type
+        bot_dir.mkdir(exist_ok=True)
+        log_file = bot_dir / f"{bot_type}_{date_str}.json"
+        
+        self._append_to_log_file(log_file, log_entry)
+    
+    def _append_to_log_file(self, log_file, log_entry):
+        """Append log entry to file"""
+        try:
+            if log_file.exists():
+                with open(log_file, 'r') as f:
+                    logs = json.load(f)
+            else:
+                logs = []
+            
+            logs.append(log_entry)
+            
+            with open(log_file, 'w') as f:
+                json.dump(logs, f, indent=2)
+        except Exception as e:
+            logger.error(f"Error writing to log file {log_file}: {e}")
+    
+    def get_logs(self, log_type="daily", identifier=None, start_date=None, end_date=None):
+        """Retrieve logs based on criteria"""
+        logs = []
+        
+        if start_date is None:
+            start_date = datetime.now() - timedelta(days=30)  # Default to last 30 days
+        if end_date is None:
+            end_date = datetime.now()
+        
+        if log_type == "daily":
+            logs = self._get_daily_logs(start_date, end_date)
+        elif log_type == "stock" and identifier:
+            logs = self._get_stock_logs(identifier, start_date, end_date)
+        elif log_type == "bot" and identifier:
+            logs = self._get_bot_logs(identifier, start_date, end_date)
+        
+        return logs
+    
+    def _get_daily_logs(self, start_date, end_date):
+        """Get daily logs within date range"""
+        logs = []
+        current_date = start_date
+        
+        while current_date <= end_date:
+            date_str = current_date.strftime("%Y-%m-%d")
+            log_file = self.daily_logs_dir / f"trading_{date_str}.json"
+            
+            if log_file.exists():
+                try:
+                    with open(log_file, 'r') as f:
+                        daily_logs = json.load(f)
+                        logs.extend(daily_logs)
+                except Exception as e:
+                    logger.error(f"Error reading daily log {log_file}: {e}")
+            
+            current_date += timedelta(days=1)
+        
+        return sorted(logs, key=lambda x: x['timestamp'], reverse=True)
+    
+    def _get_stock_logs(self, stock_symbol, start_date, end_date):
+        """Get stock-specific logs within date range"""
+        logs = []
+        stock_dir = self.stock_logs_dir / stock_symbol
+        
+        if not stock_dir.exists():
+            return logs
+        
+        current_date = start_date
+        while current_date <= end_date:
+            date_str = current_date.strftime("%Y-%m-%d")
+            log_file = stock_dir / f"{stock_symbol}_{date_str}.json"
+            
+            if log_file.exists():
+                try:
+                    with open(log_file, 'r') as f:
+                        daily_logs = json.load(f)
+                        logs.extend(daily_logs)
+                except Exception as e:
+                    logger.error(f"Error reading stock log {log_file}: {e}")
+            
+            current_date += timedelta(days=1)
+        
+        return sorted(logs, key=lambda x: x['timestamp'], reverse=True)
+    
+    def _get_bot_logs(self, bot_type, start_date, end_date):
+        """Get bot-specific logs within date range"""
+        logs = []
+        bot_dir = self.bot_logs_dir / bot_type
+        
+        if not bot_dir.exists():
+            return logs
+        
+        current_date = start_date
+        while current_date <= end_date:
+            date_str = current_date.strftime("%Y-%m-%d")
+            log_file = bot_dir / f"{bot_type}_{date_str}.json"
+            
+            if log_file.exists():
+                try:
+                    with open(log_file, 'r') as f:
+                        daily_logs = json.load(f)
+                        logs.extend(daily_logs)
+                except Exception as e:
+                    logger.error(f"Error reading bot log {log_file}: {e}")
+            
+            current_date += timedelta(days=1)
+        
+        return sorted(logs, key=lambda x: x['timestamp'], reverse=True)
+    
+    def archive_old_logs(self, days_to_keep=90):
+        """Archive logs older than specified days"""
+        cutoff_date = datetime.now() - timedelta(days=days_to_keep)
+        
+        # Archive daily logs
+        self._archive_logs_in_directory(self.daily_logs_dir, cutoff_date, "daily")
+        
+        # Archive stock logs
+        for stock_dir in self.stock_logs_dir.iterdir():
+            if stock_dir.is_dir():
+                self._archive_logs_in_directory(stock_dir, cutoff_date, f"stock_{stock_dir.name}")
+        
+        # Archive bot logs
+        for bot_dir in self.bot_logs_dir.iterdir():
+            if bot_dir.is_dir():
+                self._archive_logs_in_directory(bot_dir, cutoff_date, f"bot_{bot_dir.name}")
+    
+    def _archive_logs_in_directory(self, log_dir, cutoff_date, archive_prefix):
+        """Archive logs in a specific directory"""
+        for log_file in log_dir.glob("*.json"):
+            try:
+                # Extract date from filename
+                file_date_str = log_file.stem.split('_')[-1]
+                file_date = datetime.strptime(file_date_str, "%Y-%m-%d")
+                
+                if file_date < cutoff_date:
+                    # Compress and move to archive
+                    archive_name = f"{archive_prefix}_{file_date_str}.json.gz"
+                    archive_path = self.archived_logs_dir / archive_name
+                    
+                    with open(log_file, 'rb') as f_in:
+                        with gzip.open(archive_path, 'wb') as f_out:
+                            f_out.write(f_in.read())
+                    
+                    # Remove original file
+                    log_file.unlink()
+                    logger.info(f"Archived log file: {log_file} -> {archive_path}")
+                    
+            except Exception as e:
+                logger.error(f"Error archiving log file {log_file}: {e}")
+    
+    def get_available_stocks(self):
+        """Get list of stocks with logs"""
+        stocks = []
+        for stock_dir in self.stock_logs_dir.iterdir():
+            if stock_dir.is_dir():
+                stocks.append(stock_dir.name)
+        return sorted(stocks)
+    
+    def get_available_bots(self):
+        """Get list of bot types with logs"""
+        bots = []
+        for bot_dir in self.bot_logs_dir.iterdir():
+            if bot_dir.is_dir():
+                bots.append(bot_dir.name)
+        return sorted(bots)
+    
+    def get_log_summary(self, start_date=None, end_date=None):
+        """Get summary statistics for logs"""
+        if start_date is None:
+            start_date = datetime.now() - timedelta(days=30)
+        if end_date is None:
+            end_date = datetime.now()
+        
+        logs = self.get_logs("daily", None, start_date, end_date)
+        
+        summary = {
+            "total_activities": len(logs),
+            "date_range": {
+                "start": start_date.strftime("%Y-%m-%d"),
+                "end": end_date.strftime("%Y-%m-%d")
+            },
+            "stocks": {},
+            "bots": {},
+            "actions": {},
+            "daily_counts": {}
+        }
+        
+        for log in logs:
+            # Count by stock
+            stock = log.get('stock', 'unknown')
+            summary['stocks'][stock] = summary['stocks'].get(stock, 0) + 1
+            
+            # Count by bot type
+            bot_type = log.get('bot_type', 'unknown')
+            summary['bots'][bot_type] = summary['bots'].get(bot_type, 0) + 1
+            
+            # Count by action
+            action = log.get('action', 'unknown')
+            summary['actions'][action] = summary['actions'].get(action, 0) + 1
+            
+            # Count by day
+            day = log.get('day', 'unknown')
+            summary['daily_counts'][day] = summary['daily_counts'].get(day, 0) + 1
+        
+        return summary
+
+# Initialize the advanced logger
+trading_logger = AdvancedTradingLogger()
+
+def create_sample_logs():
+    """Create sample trading logs for demonstration"""
+    from datetime import datetime, timedelta
+    import random
+    
+    stocks = ['AAPL', 'TSLA', 'GOOGL', 'MSFT', 'NVDA', 'META', 'AMZN']
+    bot_types = ['PPO', 'DQN', 'A2C', 'SAC']
+    actions = ['buy', 'sell', 'hold', 'train_model', 'import_data', 'simulation_run']
+    
+    # Create logs for the last 30 days
+    for i in range(30):
+        date = datetime.now() - timedelta(days=i)
+        
+        # Create 5-15 random log entries per day
+        num_logs = random.randint(5, 15)
+        
+        for j in range(num_logs):
+            stock = random.choice(stocks)
+            bot_type = random.choice(bot_types)
+            action = random.choice(actions)
+            
+            # Randomize timestamp within the day
+            hour = random.randint(9, 16)  # Trading hours
+            minute = random.randint(0, 59)
+            second = random.randint(0, 59)
+            
+            timestamp = date.replace(hour=hour, minute=minute, second=second)
+            
+            # Create realistic details based on action
+            details = {}
+            if action in ['buy', 'sell']:
+                details = {
+                    'quantity': random.randint(1, 100),
+                    'price': round(random.uniform(50, 300), 2),
+                    'value': round(random.uniform(100, 10000), 2),
+                    'profit_loss': round(random.uniform(-500, 1000), 2),
+                    'confidence': round(random.uniform(0.6, 0.95), 3)
+                }
+            elif action == 'train_model':
+                details = {
+                    'duration_minutes': random.randint(10, 180),
+                    'training_steps': random.randint(1000, 50000),
+                    'final_reward': round(random.uniform(-2, 10), 3),
+                    'loss': round(random.uniform(0.001, 0.1), 4)
+                }
+            elif action == 'import_data':
+                details = {
+                    'data_points': random.randint(100, 5000),
+                    'time_range_days': random.randint(1, 30),
+                    'status': 'success' if random.random() > 0.1 else 'partial'
+                }
+            elif action == 'simulation_run':
+                details = {
+                    'days_simulated': random.randint(7, 90),
+                    'win_rate': round(random.uniform(0.45, 0.85), 3),
+                    'total_return': round(random.uniform(-15, 25), 2),
+                    'sharpe_ratio': round(random.uniform(0.5, 2.5), 3)
+                }
+            
+            trading_logger.log_trading_activity(
+                stock_symbol=stock,
+                bot_type=bot_type,
+                action=action,
+                details=details,
+                timestamp=timestamp
+            )
+
+# Create sample logs on startup (only if no logs exist)
+def initialize_sample_logs():
+    """Initialize sample logs if none exist"""
+    try:
+        # Check if any logs exist
+        summary = trading_logger.get_log_summary()
+        if summary['total_activities'] == 0:
+            logger.info("Creating sample trading logs...")
+            create_sample_logs()
+            logger.info("Sample trading logs created successfully")
+    except Exception as e:
+        logger.error(f"Error creating sample logs: {e}")
 
 app = Flask(__name__)
 CORS(app)
@@ -832,6 +1186,190 @@ def get_saved_models():
         logger.error(f"Error getting saved models: {e}")
         return jsonify({'error': str(e)}), 500
 
+# Advanced Logging API Endpoints
+
+@app.route('/logs/advanced', methods=['GET'])
+def get_advanced_logs():
+    """Get trading logs with advanced filtering"""
+    try:
+        # Get query parameters
+        log_type = request.args.get('type', 'daily')  # daily, stock, bot
+        identifier = request.args.get('identifier')  # stock symbol or bot type
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+        
+        # Parse dates
+        start_date = None
+        end_date = None
+        
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+        if end_date_str:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
+        
+        # Get logs
+        logs = trading_logger.get_logs(log_type, identifier, start_date, end_date)
+        
+        return jsonify({
+            'success': True,
+            'logs': logs,
+            'count': len(logs),
+            'filters': {
+                'type': log_type,
+                'identifier': identifier,
+                'start_date': start_date_str,
+                'end_date': end_date_str
+            },
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting advanced logs: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/logs/summary', methods=['GET'])
+def get_log_summary():
+    """Get log summary statistics"""
+    try:
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+        
+        start_date = None
+        end_date = None
+        
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+        if end_date_str:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
+        
+        summary = trading_logger.get_log_summary(start_date, end_date)
+        
+        return jsonify({
+            'success': True,
+            'summary': summary,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting log summary: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/logs/stocks', methods=['GET'])
+def get_available_stocks():
+    """Get list of stocks with logs"""
+    try:
+        stocks = trading_logger.get_available_stocks()
+        
+        return jsonify({
+            'success': True,
+            'stocks': stocks,
+            'count': len(stocks),
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting available stocks: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/logs/bots', methods=['GET'])
+def get_available_bots():
+    """Get list of bot types with logs"""
+    try:
+        bots = trading_logger.get_available_bots()
+        
+        return jsonify({
+            'success': True,
+            'bots': bots,
+            'count': len(bots),
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting available bots: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/logs/download', methods=['GET'])
+def download_logs():
+    """Download logs as JSON file"""
+    try:
+        # Get query parameters
+        log_type = request.args.get('type', 'daily')
+        identifier = request.args.get('identifier')
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+        
+        # Parse dates
+        start_date = None
+        end_date = None
+        
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+        if end_date_str:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
+        
+        # Get logs
+        logs = trading_logger.get_logs(log_type, identifier, start_date, end_date)
+        
+        # Create download data
+        download_data = {
+            'export_info': {
+                'exported_at': datetime.now().isoformat(),
+                'type': log_type,
+                'identifier': identifier,
+                'date_range': {
+                    'start': start_date_str,
+                    'end': end_date_str
+                },
+                'total_records': len(logs)
+            },
+            'logs': logs
+        }
+        
+        # Create filename
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        if log_type == 'stock' and identifier:
+            filename = f"trading_logs_{identifier}_{timestamp}.json"
+        elif log_type == 'bot' and identifier:
+            filename = f"bot_logs_{identifier}_{timestamp}.json"
+        else:
+            filename = f"trading_logs_daily_{timestamp}.json"
+        
+        # Create temporary file
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump(download_data, f, indent=2)
+            temp_path = f.name
+        
+        # Return file
+        return send_file(
+            temp_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/json'
+        )
+        
+    except Exception as e:
+        logger.error(f"Error downloading logs: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/logs/archive', methods=['POST'])
+def archive_old_logs():
+    """Archive old logs"""
+    try:
+        days_to_keep = request.json.get('days_to_keep', 90)
+        
+        trading_logger.archive_old_logs(days_to_keep)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully archived logs older than {days_to_keep} days',
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error archiving logs: {e}")
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     logger.info("Starting Simplified Trading Bot API Server")
     
@@ -843,6 +1381,9 @@ if __name__ == '__main__':
             logger.info(f"Account Cash: ${result.get('cash', 'N/A')}")
     else:
         logger.warning(f"⚠️  Alpaca API connection failed: {result}")
+    
+    # Initialize sample logs if needed
+    initialize_sample_logs()
     
     port = int(os.getenv('PORT', 8080))  # Use port 8080
     app.run(host='0.0.0.0', port=port, debug=True, threaded=True)

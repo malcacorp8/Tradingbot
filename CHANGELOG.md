@@ -14,6 +14,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Contributing guidelines for developers
 - Automated dependency scanning
 
+## [2.1.0] - 2025-08-05
+
+### Added
+- 📈 **Trading Simulation Charts**: Interactive visualization system with Chart.js
+  - Real-time chart display of buy/sell signals
+  - Toggle between price analysis and portfolio performance views
+  - Buy signals marked with green triangles, sell signals with red squares
+  - Comprehensive performance metrics dashboard
+  - Trade history table with detailed transaction analysis
+- 📊 **Advanced Logging System**: Comprehensive log management and analytics
+  - Daily, stock-specific, and bot-specific log organization
+  - Advanced filtering by date range, stock symbol, and bot type
+  - Download capabilities for filtered log subsets in JSON format
+  - Log summary statistics with real-time activity tracking
+  - Automated log archival system with compression
+- 🎯 **Enhanced Backend Simulation**: Improved simulation data structure
+  - Complete time series data for charting (168+ data points)
+  - Detailed trade information with timestamps and position changes
+  - Portfolio value tracking over time
+  - Comprehensive performance metrics calculation
+- 🎨 **Frontend Dependencies**: Added Chart.js ecosystem
+  - Chart.js v4.4.0 for professional charting capabilities
+  - vue-chartjs v5.3.0 for Vue 3 integration
+  - Responsive chart components with interactive features
+
+### Enhanced
+- 🔧 **Simulation Results**: Enhanced mock simulation with realistic data
+  - Time-series price movement simulation
+  - Realistic trading decision patterns
+  - Complete portfolio tracking over simulation period
+- 📋 **API Endpoints**: New logging and download endpoints
+  - `/api/logs/advanced` - Advanced log filtering
+  - `/api/logs/summary` - Log summary statistics
+  - `/api/logs/download` - Filtered log downloads
+  - `/api/logs/stocks` - Available stocks with logs
+  - `/api/logs/bots` - Available bot types with logs
+- 🎛️ **User Interface**: Improved log management interface
+  - Interactive log filtering controls
+  - Real-time summary dashboard
+  - Download and archive functionality
+  - Responsive design for all screen sizes
+
+### Fixed
+- 🐛 **Chart Data Structure**: Proper data formatting for Chart.js
+- 🔧 **Log File Management**: Efficient log organization and retrieval
+- 📊 **Performance Metrics**: Accurate calculation of trading statistics
+
 ## [2.0.0] - 2025-08-03
 
 ### Added

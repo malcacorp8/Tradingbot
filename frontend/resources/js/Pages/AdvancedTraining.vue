@@ -477,6 +477,11 @@
                     </div>
                 </div>
 
+                <!-- Trading Simulation Chart -->
+                <div v-if="simulationResult && simulationResult.success && simulationResult.chart_data" class="mb-6">
+                    <TradingSimulationChart :simulation-data="simulationResult" />
+                </div>
+
                 <!-- Available Models -->
                 <div v-if="availableModels.length > 0" class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="p-6 text-gray-900">
@@ -503,6 +508,7 @@
 import { ref, onMounted } from 'vue'
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
 import PrimaryButton from '@/Components/PrimaryButton.vue'
+import TradingSimulationChart from '@/Components/TradingSimulationChart.vue'
 
 // Reactive data
 const searchQuery = ref('')

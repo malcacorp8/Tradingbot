@@ -569,20 +569,21 @@ class AdvancedTrainingSystem:
             return []
     
     def _generate_mock_simulation_results(self, symbol: str, days: int) -> Dict:
-        """Generate mock simulation results for demonstration"""
+        """Generate mock simulation results for demonstration with complete chart data"""
         import random
         import time
+        from datetime import datetime, timedelta
         
         # Generate realistic mock data based on symbol
         mock_data = {
-            'AAPL': {'base_return': 8.5, 'base_win_rate': 68.2, 'volatility': 0.15},
-            'TSLA': {'base_return': 12.3, 'base_win_rate': 65.8, 'volatility': 0.25},
-            'GOOGL': {'base_return': 6.9, 'base_win_rate': 71.5, 'volatility': 0.12},
-            'MSFT': {'base_return': 9.1, 'base_win_rate': 69.7, 'volatility': 0.14},
-            'NVDA': {'base_return': 15.8, 'base_win_rate': 63.4, 'volatility': 0.28}
+            'AAPL': {'base_return': 8.5, 'base_win_rate': 68.2, 'volatility': 0.15, 'base_price': 214.0},
+            'TSLA': {'base_return': 12.3, 'base_win_rate': 65.8, 'volatility': 0.25, 'base_price': 180.0},
+            'GOOGL': {'base_return': 6.9, 'base_win_rate': 71.5, 'volatility': 0.12, 'base_price': 2800.0},
+            'MSFT': {'base_return': 9.1, 'base_win_rate': 69.7, 'volatility': 0.14, 'base_price': 450.0},
+            'NVDA': {'base_return': 15.8, 'base_win_rate': 63.4, 'volatility': 0.28, 'base_price': 1200.0}
         }
         
-        base_stats = mock_data.get(symbol, {'base_return': 7.5, 'base_win_rate': 66.0, 'volatility': 0.18})
+        base_stats = mock_data.get(symbol, {'base_return': 7.5, 'base_win_rate': 66.0, 'volatility': 0.18, 'base_price': 100.0})
         
         # Add some randomness to make it realistic
         total_return_pct = base_stats['base_return'] + random.uniform(-5, 5)
@@ -594,34 +595,114 @@ class AdvancedTrainingSystem:
         initial_value = 10000.0
         final_value = initial_value * (1 + total_return_pct / 100)
         
-        # Generate mock trades
+        # Generate time series data for chart
+        start_date = datetime.now() - timedelta(days=days)
+        data_points = days * 24  # Hourly data for demonstration
+        chart_data = []
+        portfolio_values = []
         trades = []
-        for i in range(min(10, total_trades)):
-            action = random.choice(['buy', 'sell'])
-            price = 200 + random.uniform(-50, 100)
-            reward = random.uniform(-0.02, 0.05) if random.random() < win_rate/100 else random.uniform(-0.05, 0.01)
-            trades.append({
-                'step': i * random.randint(5, 15),
-                'action': action,
-                'price': price,
-                'reward': reward
+        
+        # Initialize values
+        current_price = base_stats['base_price']
+        current_balance = initial_value
+        current_position = 0
+        
+        for i in range(data_points):
+            # Generate timestamp
+            timestamp = start_date + timedelta(hours=i)
+            timestamp_str = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Simulate price movement (random walk with trend)
+            price_change = random.normalvariate(0, current_price * base_stats['volatility'] / 100)
+            current_price = max(current_price + price_change, current_price * 0.9)  # Prevent negative prices
+            
+            # Simulate trading decisions (random for demo)
+            action = 0  # 0 = hold, 1 = buy, 2 = sell
+            reward = 0
+            
+            # Occasionally make a trade
+            if random.random() < 0.05 and len(trades) < total_trades:  # 5% chance of trade
+                if current_position <= 0 and random.random() < 0.6:  # More likely to buy when no position
+                    action = 1  # Buy
+                    shares_to_buy = min(10, int(current_balance / current_price))
+                    if shares_to_buy > 0:
+                        cost = shares_to_buy * current_price
+                        current_balance -= cost
+                        current_position += shares_to_buy
+                        reward = random.uniform(-0.02, 0.05) if random.random() < win_rate/100 else random.uniform(-0.05, 0.01)
+                        
+                        trades.append({
+                            'step': i,
+                            'timestamp': timestamp_str,
+                            'action': 'buy',
+                            'price': float(current_price),
+                            'reward': float(reward),
+                            'position_before': float(current_position - shares_to_buy),
+                            'position_after': float(current_position),
+                            'balance': float(current_balance),
+                            'portfolio_value': float(current_balance + current_position * current_price)
+                        })
+                
+                elif current_position > 0 and random.random() < 0.4:  # Sell when holding position
+                    action = 2  # Sell
+                    shares_to_sell = min(current_position, random.randint(1, current_position))
+                    if shares_to_sell > 0:
+                        proceeds = shares_to_sell * current_price
+                        current_balance += proceeds
+                        current_position -= shares_to_sell
+                        reward = random.uniform(-0.02, 0.05) if random.random() < win_rate/100 else random.uniform(-0.05, 0.01)
+                        
+                        trades.append({
+                            'step': i,
+                            'timestamp': timestamp_str,
+                            'action': 'sell',
+                            'price': float(current_price),
+                            'reward': float(reward),
+                            'position_before': float(current_position + shares_to_sell),
+                            'position_after': float(current_position),
+                            'balance': float(current_balance),
+                            'portfolio_value': float(current_balance + current_position * current_price)
+                        })
+            
+            # Calculate portfolio value
+            portfolio_value = current_balance + current_position * current_price
+            portfolio_values.append(portfolio_value)
+            
+            # Store chart data point
+            chart_data.append({
+                'timestamp': timestamp_str,
+                'price': float(current_price),
+                'portfolio_value': float(portfolio_value),
+                'position': float(current_position),
+                'balance': float(current_balance),
+                'action': int(action),
+                'reward': float(reward),
+                'volume': float(random.randint(1000, 100000))  # Mock volume
             })
         
         return {
+            'success': True,
+            'symbol': symbol,
             'total_reward': random.uniform(0.5, 2.8),
             'total_return_pct': total_return_pct,
             'initial_value': initial_value,
             'final_value': final_value,
-            'total_trades': total_trades,
+            'total_trades': len(trades),
             'win_rate': win_rate,
             'winning_trades': winning_trades,
             'losing_trades': losing_trades,
-            'avg_win': random.uniform(0.02, 0.08),
-            'avg_loss': random.uniform(-0.06, -0.01),
-            'max_drawdown': random.uniform(3.2, 12.8),
+            'avg_win_pct': random.uniform(0.02, 0.08),
+            'avg_loss_pct': random.uniform(-0.06, -0.01),
+            'max_drawdown_pct': random.uniform(3.2, 12.8),
             'sharpe_ratio': random.uniform(0.8, 2.1),
-            'trades': trades,
-            'portfolio_values': [initial_value + random.uniform(-500, 1500) for _ in range(30)]
+            'trades': trades,  # All trades with detailed info
+            'chart_data': chart_data,  # Complete time series for charting
+            'portfolio_values': portfolio_values,  # Portfolio values over time
+            'simulation_period': {
+                'start_date': chart_data[0]['timestamp'] if chart_data else None,
+                'end_date': chart_data[-1]['timestamp'] if chart_data else None,
+                'total_steps': len(chart_data)
+            }
         }
 
     def _get_current_price(self, symbol: str) -> Optional[float]:
@@ -807,20 +888,55 @@ class AdvancedTrainingSystem:
             total_reward = 0
             trades = []
             portfolio_values = []
+            chart_data = []
+            position_history = []
             
             for step in range(len(df) - 1):
                 action, _ = model.predict(obs, deterministic=True)
                 obs, reward, done, info = env.step(action)
                 
                 total_reward += reward
-                portfolio_values.append(env.balance + env.position * df['Close'].iloc[step])
+                current_portfolio_value = env.balance + env.position * df['Close'].iloc[step]
+                portfolio_values.append(current_portfolio_value)
                 
+                # Get timestamp - handle different formats
+                timestamp = df.index[step]
+                if hasattr(timestamp, 'strftime'):
+                    timestamp_str = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    # Convert timestamp to datetime if it's not already
+                    try:
+                        timestamp_dt = pd.to_datetime(timestamp)
+                        timestamp_str = timestamp_dt.strftime('%Y-%m-%d %H:%M:%S')
+                    except:
+                        timestamp_str = str(timestamp)
+                
+                # Store chart data for every step
+                chart_data.append({
+                    'timestamp': timestamp_str,
+                    'price': float(df['Close'].iloc[step]),
+                    'portfolio_value': float(current_portfolio_value),
+                    'position': float(env.position),
+                    'balance': float(env.balance),
+                    'action': int(action),
+                    'reward': float(reward),
+                    'volume': float(df.get('Volume', df.get('volume', 0)).iloc[step]) if 'Volume' in df.columns or 'volume' in df.columns else 0
+                })
+                
+                position_history.append(float(env.position))
+                
+                # Record trades (buy/sell actions)
                 if action in [1, 2]:  # Buy or Sell
                     trades.append({
                         'step': step,
+                        'timestamp': timestamp_str,
                         'action': 'buy' if action == 1 else 'sell',
                         'price': float(df['Close'].iloc[step]),
-                        'reward': float(reward)
+                        'reward': float(reward),
+                        'position_before': float(position_history[step-1] if step > 0 else 0),
+                        'position_after': float(env.position),
+                        'balance': float(env.balance),
+                        'portfolio_value': float(current_portfolio_value)
                     })
                 
                 if done:
@@ -861,6 +977,8 @@ class AdvancedTrainingSystem:
                 sharpe_ratio = 0
             
             return {
+                'success': True,
+                'symbol': symbol,
                 'total_reward': float(total_reward),
                 'total_return_pct': float(total_return),
                 'initial_value': float(initial_value),
@@ -869,14 +987,20 @@ class AdvancedTrainingSystem:
                 'win_rate': float(win_rate),
                 'winning_trades': len(winning_trades),
                 'losing_trades': len(losing_trades),
-                'avg_win': float(avg_win),
-                'avg_loss': float(avg_loss),
-                'max_drawdown': float(max_drawdown),
+                'avg_win_pct': float(avg_win),
+                'avg_loss_pct': float(avg_loss),
+                'max_drawdown_pct': float(max_drawdown),
                 'sharpe_ratio': float(sharpe_ratio),
-                'trades': trades[-10:],  # Last 10 trades for display
-                'portfolio_values': portfolio_values[-50:]  # Last 50 values for chart
+                'trades': trades,  # All trades for detailed analysis
+                'chart_data': chart_data,  # Complete time series data for charting
+                'portfolio_values': portfolio_values,  # Portfolio value over time
+                'simulation_period': {
+                    'start_date': chart_data[0]['timestamp'] if chart_data else None,
+                    'end_date': chart_data[-1]['timestamp'] if chart_data else None,
+                    'total_steps': len(chart_data)
+                }
             }
             
         except Exception as e:
             logger.error(f"Error in simulation: {e}")
-            return {'error': str(e)} 
+            return {'success': False, 'error': str(e)} 

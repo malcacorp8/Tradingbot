@@ -26,6 +26,8 @@
 - ✅ **Paper Trading Mode**: $100,000 virtual account for safe testing
 - ✅ **Multi-Stock Support**: Trade multiple stocks simultaneously (AAPL, GOOGL, TSLA)
 - ✅ **Risk Management**: Built-in stop-losses and position limits
+- ✅ **Interactive Simulation Charts**: Visualize buy/sell signals with Chart.js integration
+- ✅ **Advanced Logging System**: Comprehensive log management with filtering and downloads
 - ✅ **Web Dashboard**: Real-time monitoring and control interface
 - ✅ **Performance Analytics**: Track returns, win rates, and AI learning progress
 - ✅ **Live Trading Ready**: Switch to real money when confident
@@ -127,6 +129,35 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - 💰 **Financial Risk**: All trading involves risk of loss
 - 📊 **Start Small**: Always begin with paper trading  
 - 👨‍💼 **Not Financial Advice**: Consult professionals before live trading
+
+## 🆕 Recent Updates
+
+### 📈 Trading Simulation Charts
+- **Interactive Visualization**: Real-time chart display of buy/sell signals
+- **Chart.js Integration**: Professional charting with Chart.js v4.4.0
+- **Dual Views**: Toggle between price analysis and portfolio performance
+- **Trade Markers**: Green triangles for buys, red squares for sells
+- **Performance Metrics**: Win rate, Sharpe ratio, drawdown analysis
+
+### 📊 Advanced Logging System
+- **Comprehensive Logging**: Daily, stock-specific, and bot-specific logs
+- **Advanced Filtering**: Filter by date range, stock, or bot type
+- **Download Capabilities**: Export filtered logs in JSON format
+- **Log Analytics**: Summary statistics and performance tracking
+- **Archival System**: Automated old log compression and storage
+
+### 🎯 Enhanced User Experience
+- **Responsive Design**: Optimized for desktop and mobile
+- **Real-time Updates**: Live data streaming and updates
+- **Intuitive Interface**: User-friendly controls and navigation
+- **Performance Dashboards**: Comprehensive metrics visualization
+
+## 📋 Documentation
+
+- **[Simulation Chart Documentation](SIMULATION_CHART_DOCUMENTATION.md)**: Complete guide to trading visualization
+- **[Advanced Logging Documentation](ADVANCED_LOGGING_DOCUMENTATION.md)**: Comprehensive logging system guide
+- **[API Reference](API_REFERENCE.md)**: Complete API documentation
+- **[User Manual](USER_MANUAL.md)**: Step-by-step usage guide
 
 ## 📊 Project Stats
 

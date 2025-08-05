@@ -550,4 +550,148 @@ class TradingBotController extends Controller
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
+
+    /**
+     * Get advanced trading logs with filtering
+     */
+    public function getAdvancedLogs(Request $request): JsonResponse
+    {
+        try {
+            $queryParams = [
+                'type' => $request->get('type', 'daily'),
+                'identifier' => $request->get('identifier'),
+                'start_date' => $request->get('start_date'),
+                'end_date' => $request->get('end_date')
+            ];
+
+            $response = Http::timeout(30)->get("{$this->backendUrl}/logs/advanced", $queryParams);
+            
+            if ($response->successful()) {
+                return response()->json($response->json());
+            }
+            
+            return response()->json(['error' => 'Failed to get advanced logs'], $response->status());
+            
+        } catch (Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get log summary statistics
+     */
+    public function getLogSummary(Request $request): JsonResponse
+    {
+        try {
+            $queryParams = [
+                'start_date' => $request->get('start_date'),
+                'end_date' => $request->get('end_date')
+            ];
+
+            $response = Http::timeout(30)->get("{$this->backendUrl}/logs/summary", $queryParams);
+            
+            if ($response->successful()) {
+                return response()->json($response->json());
+            }
+            
+            return response()->json(['error' => 'Failed to get log summary'], $response->status());
+            
+        } catch (Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get list of stocks with logs
+     */
+    public function getAvailableStocks(): JsonResponse
+    {
+        try {
+            $response = Http::timeout(30)->get("{$this->backendUrl}/logs/stocks");
+            
+            if ($response->successful()) {
+                return response()->json($response->json());
+            }
+            
+            return response()->json(['error' => 'Failed to get available stocks'], $response->status());
+            
+        } catch (Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get list of bot types with logs
+     */
+    public function getAvailableBots(): JsonResponse
+    {
+        try {
+            $response = Http::timeout(30)->get("{$this->backendUrl}/logs/bots");
+            
+            if ($response->successful()) {
+                return response()->json($response->json());
+            }
+            
+            return response()->json(['error' => 'Failed to get available bots'], $response->status());
+            
+        } catch (Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Download logs as file
+     */
+    public function downloadLogs(Request $request)
+    {
+        try {
+            $queryParams = [
+                'type' => $request->get('type', 'daily'),
+                'identifier' => $request->get('identifier'),
+                'start_date' => $request->get('start_date'),
+                'end_date' => $request->get('end_date')
+            ];
+
+            $response = Http::timeout(60)->get("{$this->backendUrl}/logs/download", $queryParams);
+            
+            if ($response->successful()) {
+                // Return download URL or file data
+                return response()->json([
+                    'success' => true,
+                    'download_url' => "{$this->backendUrl}/logs/download?" . http_build_query($queryParams),
+                    'message' => 'Download ready'
+                ]);
+            }
+            
+            return response()->json(['error' => 'Failed to prepare download'], $response->status());
+            
+        } catch (Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Archive old logs
+     */
+    public function archiveLogs(Request $request): JsonResponse
+    {
+        $request->validate([
+            'days_to_keep' => 'sometimes|integer|min:1|max:365'
+        ]);
+
+        try {
+            $response = Http::timeout(30)->post("{$this->backendUrl}/logs/archive", [
+                'days_to_keep' => $request->get('days_to_keep', 90)
+            ]);
+            
+            if ($response->successful()) {
+                return response()->json($response->json());
+            }
+            
+            return response()->json(['error' => 'Failed to archive logs'], $response->status());
+            
+        } catch (Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
 }
